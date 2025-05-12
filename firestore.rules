@@ -1,0 +1,40 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // Helper function (you can keep it or remove if unused)
+    function hasRole(role) {
+      return request.auth != null
+          && get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == role;
+    }
+
+    // ——————————————————————————
+    // SOPs collection
+    // ——————————————————————————
+    match /sops/{sopId} {
+      // allow both get (single doc) and list (queries) for any signed-in user
+      allow get, list: if request.auth != null;
+
+      // creation by any authenticated user
+      allow create: if request.auth != null;
+
+      // only the original creator may modify or delete
+      allow update, delete: if request.auth.uid == resource.data.createdBy;
+    }
+
+    // ——————————————————————————
+    // User profiles
+    // ——————————————————————————
+    match /users/{userId} {
+      // users can read or write only their own profile
+      allow get, update: if request.auth.uid == userId;
+    }
+
+    // ——————————————————————————
+    // Lock everything else down
+    // ——————————————————————————
+    match /{document=**} {
+      allow read, write: if false;
+    }
+  }
+}
